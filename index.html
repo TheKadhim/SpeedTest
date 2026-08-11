@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OurSpeed // Multi-Region Internet Diagnostics</title>
+<style>
+:root{--bg:#050806;--panel:#08100b;--line:#17351f;--green:#75ff97;--dim:#63936c;--text:#d2f5d8;--red:#ff6b6b;--amber:#e7c56b}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 "Courier New",monospace}
+body{min-height:100vh}#matrix{position:fixed;inset:0;width:100%;height:100%;opacity:.065;z-index:0;pointer-events:none}
+.wrap{position:relative;z-index:1;max-width:1100px;margin:auto;padding:28px 16px 60px}.top{border-bottom:1px solid var(--line);padding-bottom:14px}.brand{font-size:24px;color:var(--green);letter-spacing:3px}.sub{font-size:11px;color:var(--dim)}
+.panel{margin-top:16px;border:1px solid var(--line);background:rgba(5,11,7,.95)}.title{padding:10px 13px;border-bottom:1px solid var(--line);font-size:11px;color:var(--dim)}
+.controls{padding:15px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}button{font:inherit;color:var(--green);background:transparent;border:1px solid #28653a;padding:10px 16px;cursor:pointer}button:hover{background:#0b1b10}button:disabled{opacity:.4;cursor:not-allowed}
+.track{height:3px;background:#0d1d12;margin:0 15px 15px}.bar{height:100%;width:0;background:var(--green);transition:width .25s}
+.hero{padding:20px 15px}.num{font-size:58px;color:var(--green)}.note{color:var(--dim);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:15px}.card{border:1px solid var(--line);padding:13px;min-height:180px}.name{color:var(--green);margin-bottom:12px}.row{display:flex;justify-content:space-between;margin:8px 0}.row span{color:var(--dim)}.tag{float:right;font-size:10px;color:var(--dim)}
+.endpoints{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:15px}.ep{border-left:2px solid #21472a;padding:8px 10px}.ep b{color:var(--green)}.meta{color:var(--dim);font-size:11px}.bad{color:var(--red)!important}
+.log{padding:14px;min-height:170px;max-height:270px;overflow:auto;white-space:pre-wrap;color:#94c99d}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.grid,.endpoints{grid-template-columns:1fr}.num{font-size:45px}}
+</style></head>
+<body><canvas id="matrix"></canvas><div class="wrap">
+<header class="top"><div class="brand">OURSPEED // DIAGNOSTICS</div><div class="sub">REAL LIBRESPEED ENGINE • MULTI-REGION • NO SYNTHETIC RESULTS</div></header>
+<section class="panel"><div class="title">CONTROL</div><div class="controls"><button id="run">[ RUN REAL TEST ]</button><span id="state" class="sub">LOADING MEASUREMENT ENGINE…</span></div><div class="track"><div class="bar" id="bar"></div></div></section>
+<section class="panel"><div class="title">AGGREGATE</div><div class="hero"><div class="num" id="overall">-- <small>Mbps</small></div><div class="note" id="summary">OurSpeed will run each public endpoint and calculate regional medians.</div></div></section>
+<section class="panel"><div class="title">REGIONAL MEDIANS</div><div class="grid">
+<div class="card" id="EU"><div class="name">EUROPE <span class="tag">3 NODES</span></div><div class="row"><span>download</span><b class="d">--</b></div><div class="row"><span>upload</span><b class="u">--</b></div><div class="row"><span>latency</span><b class="l">--</b></div><div class="row"><span>jitter</span><b class="j">--</b></div><div class="row"><span>loss</span><b class="p">--</b></div></div>
+<div class="card" id="US"><div class="name">UNITED STATES <span class="tag">3 NODES</span></div><div class="row"><span>download</span><b class="d">--</b></div><div class="row"><span>upload</span><b class="u">--</b></div><div class="row"><span>latency</span><b class="l">--</b></div><div class="row"><span>jitter</span><b class="j">--</b></div><div class="row"><span>loss</span><b class="p">--</b></div></div>
+<div class="card" id="NEAR"><div class="name">NEARBY / IRAN <span class="tag">1 NODE</span></div><div class="row"><span>download</span><b class="d">--</b></div><div class="row"><span>upload</span><b class="u">--</b></div><div class="row"><span>latency</span><b class="l">--</b></div><div class="row"><span>jitter</span><b class="j">--</b></div><div class="row"><span>loss</span><b class="p">--</b></div></div>
+<div class="card" id="ASIA"><div class="name">ASIA <span class="tag">1 NODE</span></div><div class="row"><span>download</span><b class="d">--</b></div><div class="row"><span>upload</span><b class="u">--</b></div><div class="row"><span>latency</span><b class="l">--</b></div><div class="row"><span>jitter</span><b class="j">--</b></div><div class="row"><span>loss</span><b class="p">--</b></div></div>
+</div></section>
+<section class="panel"><div class="title">ENDPOINTS</div><div class="endpoints" id="eps"></div></section>
+<section class="panel"><div class="title">TERMINAL</div><div class="log" id="log">$ ourspeed --real --multi-region
+Waiting for LibreSpeed engine…</div></section>
+</div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/librespeed/speedtest@master/speedtest.js"></script>
+<script>
+const S=window.OURSPEED_SERVERS,$=s=>document.querySelector(s),sleep=x=>new Promise(r=>setTimeout(r,x));
+const med=a=>{a=a.filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return null;let m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2};
+const log=x=>{$("#log").textContent+="\n$ "+x;$("#log").scrollTop=$("#log").scrollHeight};
+S.forEach(s=>{let e=document.createElement("div");e.className="ep";e.id="ep-"+s.id;e.innerHTML="<b>"+s.name+"</b><div class='meta'>WAITING</div>";$("#eps").appendChild(e)});
+function stat(id,x,bad=false){let m=$("#ep-"+id+" .meta");m.textContent=x;m.classList.toggle("bad",bad)}
+function render(r,x){let e=$("#"+r);if(!x){e.querySelectorAll("b").forEach(b=>b.textContent="NO DATA");return}e.querySelector(".d").textContent=x.d.toFixed(1)+" Mbps";e.querySelector(".u").textContent=x.u.toFixed(1)+" Mbps";e.querySelector(".l").textContent=x.ping.toFixed(1)+" ms";e.querySelector(".j").textContent=x.jit.toFixed(1)+" ms";e.querySelector(".p").textContent=x.loss.toFixed(1)+"%"}
+let loaded=typeof Speedtest==="function";
+$("#state").textContent=loaded?"READY":"ENGINE FAILED";
+async function one(s){
+ return await new Promise((resolve,reject)=>{
+   let t;
+   try{
+     let st=new Speedtest();
+     st.setParameter("telemetry_level","disabled");
+     st.setParameter("time_ul_max",8);
+     st.setParameter("time_dl_max",8);
+     st.addTestPoint({...s});
+     st.setSelectedServer(s);
+     st.onupdate=d=>{
+       let p=Math.max(d.dlProgress||0,d.ulProgress||0,d.pingProgress||0);
+       if(d.testState===1) stat(s.id,"DOWNLOAD "+(d.dlStatus||0).toFixed(1)+" Mbps");
+       else if(d.testState===2) stat(s.id,"PING "+(d.pingStatus||0).toFixed(0)+" ms");
+       else if(d.testState===3) stat(s.id,"UPLOAD "+(d.ulStatus||0).toFixed(1)+" Mbps");
+       $("#bar").style.width=Math.min(100,p*100)+"%";
+     };
+     st.onend=aborted=>{
+       clearTimeout(t);
+       if(aborted) return reject(Error("aborted"));
+       let d=st._lastData;
+       resolve(d);
+     };
+     // Official engine sends final data through onupdate before onend; capture it.
+     st.onupdate=(orig=>function(d){st._lastData=d; orig(d)})(st.onupdate);
+     t=setTimeout(()=>{try{st.abort()}catch{};reject(Error("timeout"))},30000);
+     st.start();
+   }catch(e){reject(e)}
+ });
+}
+async function run(){
+ if(typeof Speedtest!=="function"){ $("#state").textContent="ENGINE NOT READY"; return }
+ $("#run").disabled=true;$("#state").textContent="RUNNING";$("#log").textContent="$ ourspeed --real --multi-region";
+ let out=[];
+ for(let i=0;i<S.length;i++){
+   let s=S[i];$("#bar").style.width=((i)/S.length*100)+"%";stat(s.id,"TESTING…");log("testing "+s.name);
+   try{
+     let d=await one(s);
+     if(!d || !Number.isFinite(d.dlStatus)) throw Error("no final measurement");
+     let x={d:d.dlStatus,u:d.ulStatus,ping:d.pingStatus,jit:d.jitterStatus,loss:0,s};
+     out.push(x);stat(s.id,`OK · ${x.d.toFixed(1)}↓ / ${x.u.toFixed(1)}↑ Mbps · ${x.ping.toFixed(0)} ms`);log("OK "+s.name);
+   }catch(e){stat(s.id,"FAILED · "+(e?.message||e),"bad");log("FAILED "+s.name+" :: "+(e?.message||e))}
+ }
+ let g={EU:[],US:[],NEAR:[],ASIA:[]};out.forEach(x=>g[x.s.region].push(x));let regional=[];
+ for(let r of Object.keys(g)){let a=g[r];if(!a.length){render(r,null);continue}let x={d:med(a.map(v=>v.d)),u:med(a.map(v=>v.u)),ping:med(a.map(v=>v.ping)),jit:med(a.map(v=>v.jit)),loss:med(a.map(v=>v.loss))};render(r,x);regional.push(x.d)}
+ if(regional.length){let m=med(regional);$("#overall").innerHTML=m.toFixed(1)+" <small>Mbps</small>";$("#summary").textContent="Median of regional median downloads. It is a destination-based diagnostic, not a universal Internet-speed number."}
+ else $("#summary").textContent="No endpoint completed a valid real measurement.";
+ $("#bar").style.width="100%";$("#state").textContent="COMPLETE · "+out.length+"/"+S.length+" endpoints";$("#run").disabled=false
+}
+$("#run").onclick=run;
+const c=$("#matrix"),ctx=c.getContext("2d"),fs=13;let drops=[];function resize(){c.width=innerWidth;c.height=innerHeight;drops=Array(Math.ceil(c.width/fs)).fill(0).map(()=>Math.random()*-50)}resize();onresize=resize;setInterval(()=>{ctx.fillStyle="rgba(5,8,6,.08)";ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle="#4cff73";ctx.font=fs+"px monospace";drops.forEach((y,i)=>{ctx.fillText(Math.random()>.5?"1":"0",i*fs,y*fs);if(y*fs>c.height&&Math.random()>.975)drops[i]=0;drops[i]++})},55);
+</script></body></html>
