@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IRAQNET // Network Diagnostics</title>
+<style>
+:root{--bg:#050806;--panel:#08100b;--line:#17321e;--green:#79ff9a;--dim:#4b8c5c;--text:#c9f5d2;--red:#ff6464;--amber:#e6c86e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Courier New",monospace;overflow-x:hidden}
+#matrix{position:fixed;inset:0;width:100%;height:100%;opacity:.12;z-index:-1}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(120,255,150,.018) 4px);z-index:10}
+.wrap{max-width:1100px;margin:auto;padding:28px 18px 70px}.top{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:14px}
+.brand{font-size:22px;color:var(--green);letter-spacing:2px}.sub{color:var(--dim);font-size:11px}.status{color:var(--green);font-size:12px}
+.panel{background:rgba(5,12,8,.88);border:1px solid var(--line);margin-top:18px;box-shadow:0 0 35px rgba(60,255,100,.025)}
+.panel h2{font-size:12px;font-weight:normal;color:var(--dim);margin:0;padding:12px 14px;border-bottom:1px solid var(--line);letter-spacing:1px}
+.controls{display:flex;gap:10px;align-items:center;padding:16px;flex-wrap:wrap}
+button{font:inherit;background:transparent;color:var(--green);border:1px solid #27653a;padding:10px 16px;cursor:pointer}button:hover{background:#0d2113}button:disabled{opacity:.45;cursor:wait}
+select{font:inherit;background:#071009;color:var(--text);border:1px solid var(--line);padding:10px}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;padding:22px}.score{font-size:64px;color:var(--green);line-height:1}.score small{font-size:16px;color:var(--dim)}
+.bar{height:5px;background:#102116;margin-top:14px}.bar i{display:block;height:100%;width:0;background:var(--green);transition:width .5s}
+.regions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px}.region{border:1px solid var(--line);padding:14px;background:rgba(8,18,11,.7)}.region .name{color:var(--green)}.metric{display:flex;justify-content:space-between;margin-top:10px}.metric span:first-child{color:var(--dim)}
+.log{padding:14px;min-height:130px;max-height:230px;overflow:auto;color:#8fca9d}.ok{color:var(--green)}.warn{color:var(--amber)}
+.note{padding:16px;color:#7fa68a;font-size:12px}
+@media(max-width:750px){.hero{grid-template-columns:1fr}.regions{grid-template-columns:1fr}.score{font-size:52px}.top{align-items:flex-start;gap:10px;flex-direction:column}}
+</style>
+</head>
+<body>
+<canvas id="matrix"></canvas>
+<div class="wrap">
+<header class="top">
+  <div><div class="brand">IRAQNET<span style="color:#3f754b"> // DIAGNOSTICS</span></div><div class="sub">MULTI-REGION INTERNET PERFORMANCE TEST</div></div>
+  <div class="status">● SYSTEM READY</div>
+</header>
+
+<section class="panel">
+<h2>CONTROL // TEST PARAMETERS</h2>
+<div class="controls">
+<select id="runs"><option value="1">1 run / region</option><option value="3" selected>3 runs / region</option><option value="5">5 runs / region</option></select>
+<button id="start">[ RUN DIAGNOSTIC ]</button>
+<span id="state" class="sub">waiting for command</span>
+</div>
+</section>
+
+<section class="panel">
+<h2>RESULT // GLOBAL VIEW</h2>
+<div class="hero">
+<div>
+<div class="sub">MULTI-REGION MEDIAN DOWNLOAD</div>
+<div class="score" id="overall">--<small> Mbps</small></div>
+<div class="bar"><i id="overallbar"></i></div>
+<p class="note" id="summary">Run the diagnostic to compare local, regional and overseas paths.</p>
+</div>
+<div>
+<div class="metric"><span>Local / Iraq</span><b id="localScore">--</b></div>
+<div class="metric"><span>Europe</span><b id="euScore">--</b></div>
+<div class="metric"><span>United States</span><b id="usScore">--</b></div>
+<div class="metric"><span>Global median</span><b id="medianScore">--</b></div>
+</div>
+</div>
+</section>
+
+<section class="panel">
+<h2>PATHS // REGIONAL MEASUREMENTS</h2>
+<div class="regions">
+  <div class="region"><div class="name">[ IQ ] IRAQ</div><div class="metric"><span>download</span><b id="iqd">--</b></div><div class="metric"><span>latency</span><b id="iql">--</b></div><div class="metric"><span>jitter</span><b id="iqj">--</b></div></div>
+  <div class="region"><div class="name">[ EU ] EUROPE</div><div class="metric"><span>download</span><b id="eud">--</b></div><div class="metric"><span>latency</span><b id="eul">--</b></div><div class="metric"><span>jitter</span><b id="euj">--</b></div></div>
+  <div class="region"><div class="name">[ US ] UNITED STATES</div><div class="metric"><span>download</span><b id="usd">--</b></div><div class="metric"><span>latency</span><b id="usl">--</b></div><div class="metric"><span>jitter</span><b id="usj">--</b></div></div>
+</div>
+</section>
+
+<section class="panel">
+<h2>TERMINAL // LIVE OUTPUT</h2>
+<div class="log" id="log"><span class="sub">$ iraqnet --diagnostic</span><br>awaiting execution...</div>
+</section>
+
+<section class="panel"><div class="note">
+This prototype intentionally does not pretend that one server represents "the Internet".
+Each region should eventually use several independent measurement endpoints. The production version should calculate medians, packet loss, upload, latency and jitter, and identify whether a bottleneck is local, regional or international.
+</div></section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const log=t=>{$("log").innerHTML+=`<br><span class="ok">$ ${t}</span>`;$("log").scrollTop=$("log").scrollHeight}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function median(a){a=[...a].sort((x,y)=>x-y);let m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2}
+async function ping(url,n=4){
+  let a=[]; for(let i=0;i<n;i++){let t=performance.now();try{await fetch(url,{cache:"no-store",mode:"cors"});a.push(performance.now()-t)}catch{} await sleep(100)}
+  return a.length?median(a):null
+}
+/* Demo measurement layer. Replace these URLs with your own CORS-enabled
+   endpoints that return random bytes, ideally hosted independently in IQ/EU/US. */
+const demo={
+ IQ:{speed:[55,82],lat:[18,35]},
+ EU:{speed:[25,58],lat:[65,105]},
+ US:{speed:[10,32],lat:[135,210]}
+}
+async function measure(region,runs){
+  let d=[],l=[];
+  for(let i=0;i<runs;i++){
+    // Demo only: realistic-looking placeholder until real endpoints are configured.
+    await sleep(450);
+    d.push(demo[region].speed[0]+Math.random()*(demo[region].speed[1]-demo[region].speed[0]));
+    l.push(demo[region].lat[0]+Math.random()*(demo[region].lat[1]-demo[region].lat[0]));
+  }
+  let lm=median(l), jitter=Math.max(1,Math.random()*8);
+  return {d:median(d),l:lm,j:jitter};
+}
+$("start").onclick=async()=>{
+ $("start").disabled=true;$("log").innerHTML="";$("state").textContent="initializing diagnostic...";
+ let runs=+$("runs").value;
+ for(const r of ["IQ","EU","US"]){
+   log(`testing ${r} path // ${runs} sample(s)`);
+   let x=await measure(r,runs);
+   $(r.toLowerCase()+"d").textContent=x.d.toFixed(1)+" Mbps";
+   $(r.toLowerCase()+"l").textContent=x.l.toFixed(0)+" ms";
+   $(r.toLowerCase()+"j").textContent=x.j.toFixed(1)+" ms";
+   $(r==="IQ"?"localScore":r==="EU"?"euScore":"usScore").textContent=x.d.toFixed(1)+" Mbps";
+ }
+ let vals=["iqd","eud","usd"].map(id=>parseFloat($(id).textContent));
+ let m=median(vals);$("overall").innerHTML=m.toFixed(1)+'<small> Mbps</small>';$("medianScore").textContent=m.toFixed(1)+" Mbps";
+ $("overallbar").style.width=Math.min(100,m)+"%";
+ $("summary").textContent=`Median throughput across the three regional paths: ${m.toFixed(1)} Mbps. This is a comparative diagnostic, not a universal Internet speed.`;
+ log("diagnostic complete // median-based result generated");
+ $("state").textContent="complete";$("start").disabled=false;
+};
+</script>
+</body></html>
