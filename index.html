@@ -1,0 +1,138 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OurSpeed // Multi-Region Internet Diagnostics</title>
+<style>
+:root{--bg:#050806;--p:#08100b;--l:#17351f;--g:#75ff97;--d:#63936c;--t:#d2f5d8;--r:#ff6969}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--t);font:14px/1.5 "Courier New",monospace}
+#matrix{position:fixed;inset:0;width:100%;height:100%;opacity:.06;z-index:0;pointer-events:none}.wrap{position:relative;z-index:1;max-width:1120px;margin:auto;padding:28px 16px 60px}
+.top{border-bottom:1px solid var(--l);padding-bottom:14px}.brand{font-size:24px;color:var(--g);letter-spacing:3px}.sub{font-size:11px;color:var(--d)}
+.panel{margin-top:16px;border:1px solid var(--l);background:rgba(5,11,7,.95)}.title{padding:10px 13px;border-bottom:1px solid var(--l);font-size:11px;color:var(--d)}
+.controls{padding:15px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}button{font:inherit;color:var(--g);background:transparent;border:1px solid #28653a;padding:10px 16px;cursor:pointer}button:disabled{opacity:.4}
+.track{height:3px;background:#0d1d12;margin:0 15px 15px}.bar{height:100%;width:0;background:var(--g);transition:.15s}.hero{padding:20px 15px}.num{font-size:58px;color:var(--g)}.note{color:var(--d);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:15px}.card{border:1px solid var(--l);padding:13px;min-height:180px}.name{color:var(--g);margin-bottom:12px}.tag{float:right;font-size:10px;color:var(--d)}.row{display:flex;justify-content:space-between;margin:8px 0}.row span{color:var(--d)}
+.endpoints{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:15px}.ep{border-left:2px solid #21472a;padding:8px 10px}.ep b{color:var(--g)}.meta{color:var(--d);font-size:11px}.bad{color:var(--r)!important}
+.log{padding:14px;min-height:180px;max-height:300px;overflow:auto;white-space:pre-wrap;color:#94c99d}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.grid,.endpoints{grid-template-columns:1fr}.num{font-size:45px}}
+</style></head>
+<body><canvas id="matrix"></canvas><div class="wrap">
+<header class="top"><div class="brand">OURSPEED // DIAGNOSTICS</div><div class="sub">REAL HTTP MEASUREMENTS • 8 ENDPOINTS IN PARALLEL • NO SYNTHETIC RESULTS</div></header>
+<section class="panel"><div class="title">CONTROL</div><div class="controls"><button id="run">[ RUN PARALLEL TEST ]</button><span id="state" class="sub">READY</span></div><div class="track"><div class="bar" id="bar"></div></div></section>
+<section class="panel"><div class="title">AGGREGATE</div><div class="hero"><div class="num" id="overall">-- <small>Mbps</small></div><div class="note" id="summary">All endpoints will start together. Failed endpoints are excluded.</div></div></section>
+<section class="panel"><div class="title">REGIONAL MEDIANS</div><div class="grid">
+<div class="card" id="EU"><div class="name">EUROPE <span class="tag">3 NODES</span></div><div class="row"><span>download</span><b class="d">--</b></div><div class="row"><span>upload</span><b class="u">--</b></div><div class="row"><span>latency</span><b class="l">--</b></div><div class="row"><span>jitter</span><b class="j">--</b></div><div class="row"><span>loss</span><b class="p">--</b></div></div>
+<div class="card" id="US"><div class="name">UNITED STATES <span class="tag">3 NODES</span></div><div class="row"><span>download</span><b class="d">--</b></div><div class="row"><span>upload</span><b class="u">--</b></div><div class="row"><span>latency</span><b class="l">--</b></div><div class="row"><span>jitter</span><b class="j">--</b></div><div class="row"><span>loss</span><b class="p">--</b></div></div>
+<div class="card" id="NEAR"><div class="name">NEARBY / IRAN <span class="tag">1 NODE</span></div><div class="row"><span>download</span><b class="d">--</b></div><div class="row"><span>upload</span><b class="u">--</b></div><div class="row"><span>latency</span><b class="l">--</b></div><div class="row"><span>jitter</span><b class="j">--</b></div><div class="row"><span>loss</span><b class="p">--</b></div></div>
+<div class="card" id="ASIA"><div class="name">ASIA <span class="tag">1 NODE</span></div><div class="row"><span>download</span><b class="d">--</b></div><div class="row"><span>upload</span><b class="u">--</b></div><div class="row"><span>latency</span><b class="l">--</b></div><div class="row"><span>jitter</span><b class="j">--</b></div><div class="row"><span>loss</span><b class="p">--</b></div></div>
+</div></section>
+<section class="panel"><div class="title">ENDPOINTS</div><div class="endpoints" id="eps"></div></section>
+<section class="panel"><div class="title">TERMINAL</div><div class="log" id="log">$ ourspeed --real --parallel
+Waiting for command.</div></section>
+</div>
+<script src="config.js"></script><script>
+const S=window.OURSPEED_SERVERS||[],C=window.OURSPEED_SETTINGS||{},$=s=>document.querySelector(s);
+const median=a=>{a=a.filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return null;let m=a.length>>1;return a.length%2?a[m]:(a[m-1]+a[m])/2};
+const log=x=>{$("#log").textContent+="\n$ "+x;$("#log").scrollTop=$("#log").scrollHeight};
+S.forEach(s=>{let e=document.createElement("div");e.className="ep";e.id="ep-"+s.id;e.innerHTML="<b>"+s.name+"</b><div class='meta'>WAITING</div>";$("#eps").appendChild(e)});
+function stat(id,text,bad=false){let e=$("#ep-"+id+" .meta");e.textContent=text;e.classList.toggle("bad",bad)}
+function render(r,x){let e=$("#"+r);if(!x){e.querySelectorAll("b").forEach(b=>b.textContent="NO DATA");return}e.querySelector(".d").textContent=x.d.toFixed(1)+" Mbps";e.querySelector(".u").textContent=x.u.toFixed(1)+" Mbps";e.querySelector(".l").textContent=x.lat.toFixed(1)+" ms";e.querySelector(".j").textContent=x.jit.toFixed(1)+" ms";e.querySelector(".p").textContent=x.loss.toFixed(1)+"%"}
+async function tf(url,opt={},timeout=12000){let c=new AbortController(),t=setTimeout(()=>c.abort(),timeout);try{return await fetch(url,{...opt,cache:"no-store",mode:"cors",signal:c.signal})}catch(e){if(e&&e.name==="AbortError")throw Error("timed out after "+timeout+"ms");throw Error(describeNetErr(e))}finally{clearTimeout(t)}}
+function describeNetErr(e){
+ // A bare "Failed to fetch" TypeError can mean: DNS failure, connection refused,
+ // TLS error, mixed-content block, an actual CORS rejection, or a firewall/DPI
+ // drop. The browser deliberately doesn't expose which — check DevTools Network
+ // tab for the real net:: error code.
+ if(e instanceof TypeError)return "network error (DNS/connection/CORS/blocked — check DevTools Network tab)";
+ return (e&&e.message)||String(e);
+}
+function base(s){return s.server.replace(/\/+$/,"")}
+async function pingNode(s){
+ let a=[],lost=0,lastErr=null;
+ for(let i=0;i<C.pingSamples;i++){let t=performance.now();try{let r=await tf(base(s)+"/"+s.pingURL+"?cors=true&os="+Date.now()+"_"+i,{},C.pingTimeoutMs);if(!r.ok)throw Error("HTTP "+r.status);await r.arrayBuffer();a.push(performance.now()-t);stat(s.id,"PING "+a.at(-1).toFixed(0)+" ms")}catch(e){lost++;lastErr=e}}
+ let lat=median(a);if(lat==null)throw Error(lastErr?lastErr.message:"no ping samples succeeded");
+ let diffs=[];for(let i=1;i<a.length;i++)diffs.push(Math.abs(a[i]-a[i-1]));
+ return{lat,jit:median(diffs)||0,loss:lost/C.pingSamples*100};
+}
+async function downloadNode(s){
+ let bytesTarget=C.downloadBytes,t=performance.now(),r=await tf(base(s)+"/"+s.dlURL+"?cors=true&ckSize="+Math.ceil(bytesTarget/1048576)+"&os="+Date.now(),{},C.phaseTimeoutMs);
+ if(!r.ok)throw Error("download HTTP "+r.status);
+ let n=0,rd=r.body&&r.body.getReader();if(rd){while(true){let q=await rd.read();if(q.done)break;n+=q.value.byteLength}}else n=(await r.arrayBuffer()).byteLength;
+ if(n<1024)throw Error("download too small");return n*8/(((performance.now()-t)/1000)*1e6);
+}
+function makeUploadBlob(bytes){
+  const chunkSize=65536; // Web Crypto limit per getRandomValues call.
+  const parts=[];
+  let remaining=bytes;
+  let seed=(Date.now()^((Math.random()*0xFFFFFFFF)>>>0))>>>0;
+
+  while(remaining>0){
+    const n=Math.min(chunkSize,remaining);
+    const a=new Uint8Array(n);
+
+    // Fast non-cryptographic PRNG. Speed-test payloads do not require
+    // cryptographic randomness; they just need not be all-zero/constant.
+    for(let i=0;i<n;i++){
+      seed^=seed<<13; seed^=seed>>>17; seed^=seed<<5; seed>>>=0;
+      a[i]=seed&255;
+    }
+
+    parts.push(a);
+    remaining-=n;
+  }
+
+  return new Blob(parts,{type:"application/octet-stream"});
+}
+
+async function uploadNode(s){
+  const n=C.uploadBytes;
+  const started=performance.now();
+
+  const r=await tf(
+    base(s)+"/"+s.ulURL+"?cors=true&os="+Date.now(),
+    {
+      method:"POST",
+      headers:{"Content-Type":"application/octet-stream"},
+      body:makeUploadBlob(n)
+    },
+    C.phaseTimeoutMs
+  );
+
+  if(!r.ok)throw Error("upload HTTP "+r.status);
+  await r.arrayBuffer().catch(()=>{});
+
+  const seconds=(performance.now()-started)/1000;
+  return n*8/(seconds*1e6);
+}
+async function measure(s){
+ const[pr,dr,ur]=await Promise.allSettled([pingNode(s),downloadNode(s),uploadNode(s)]);
+ const fails=[];
+ if(pr.status==="rejected")fails.push("ping: "+pr.reason.message);
+ if(dr.status==="rejected")fails.push("download: "+dr.reason.message);
+ if(ur.status==="rejected")fails.push("upload: "+ur.reason.message);
+ if(pr.status==="rejected"&&dr.status==="rejected"&&ur.status==="rejected"){
+  throw Error(fails.join(" | "));
+ }
+ const p=pr.status==="fulfilled"?pr.value:{lat:NaN,jit:NaN,loss:100};
+ const d=dr.status==="fulfilled"?dr.value:NaN;
+ const u=ur.status==="fulfilled"?ur.value:NaN;
+ return{d,u,...p,s,partial:fails.length?fails:null};
+}
+async function run(){
+ if(!S.length){$("#state").textContent="NO SERVERS";return}
+ $("#run").disabled=true;$("#state").textContent="RUNNING 8 ENDPOINTS IN PARALLEL";$("#log").textContent="$ ourspeed --real --parallel";$("#overall").innerHTML='-- <small>Mbps</small>';
+ ["EU","US","NEAR","ASIA"].forEach(r=>$("#"+r).querySelectorAll("b").forEach(b=>b.textContent="--"));
+ let done=0;
+ const promises=S.map(async s=>{stat(s.id,"STARTING…");log("starting "+s.name);try{let x=await measure(s);done++;$("#bar").style.width=done/S.length*100+"%";
+   const dTxt=Number.isFinite(x.d)?x.d.toFixed(1)+"↓":"--↓",uTxt=Number.isFinite(x.u)?x.u.toFixed(1)+"↑":"--↑",lTxt=Number.isFinite(x.lat)?x.lat.toFixed(0)+"ms":"--ms";
+   if(x.partial){stat(s.id,`PARTIAL · ${dTxt} / ${uTxt} Mbps · ${lTxt} · (${x.partial.join(", ")})`,true);log(`PARTIAL ${s.name} :: ${dTxt} / ${uTxt} / ${lTxt} :: ${x.partial.join(" | ")}`)}
+   else{stat(s.id,`OK · ${dTxt} / ${uTxt} Mbps · ${lTxt}`);log(`OK ${s.name} :: ${dTxt} / ${uTxt} / ${lTxt}`)}
+   return x}catch(e){done++;$("#bar").style.width=done/S.length*100+"%";stat(s.id,"FAILED · "+(e.message||"error"),true);log("FAILED "+s.name+" :: "+(e.message||"error"));return null}});
+ const results=(await Promise.all(promises)).filter(Boolean),g={EU:[],US:[],NEAR:[],ASIA:[]};
+ results.forEach(x=>{if(g[x.s.region])g[x.s.region].push(x)});
+ let regional=[];
+ Object.keys(g).forEach(r=>{let a=g[r];if(!a.length){render(r,null);return}let x={d:median(a.map(v=>v.d)),u:median(a.map(v=>v.u)),lat:median(a.map(v=>v.lat)),jit:median(a.map(v=>v.jit)),loss:median(a.map(v=>v.loss))};render(r,x);regional.push(x.d)});
+ if(regional.length){let m=median(regional);$("#overall").innerHTML=m.toFixed(1)+" <small>Mbps</small>";$("#summary").textContent=`Same-time snapshot: ${results.length}/${S.length} endpoints returned valid measurements. Regional medians use successful paths only.`}else $("#summary").textContent="No endpoint returned a valid measurement.";
+ $("#bar").style.width="100%";$("#state").textContent=`COMPLETE · ${results.length}/${S.length} endpoints successful`;$("#run").disabled=false
+}
+$("#run").onclick=run;
+const c=$("#matrix"),ctx=c.getContext("2d"),fs=13;let drops=[];function resize(){c.width=innerWidth;c.height=innerHeight;drops=Array(Math.ceil(c.width/fs)).fill(0).map(()=>Math.random()*-50)}resize();addEventListener("resize",resize);setInterval(()=>{ctx.fillStyle="rgba(5,8,6,.08)";ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle="#4cff73";ctx.font=fs+"px monospace";drops.forEach((y,i)=>{ctx.fillText(Math.random()>.5?"1":"0",i*fs,y*fs);if(y*fs>c.height&&Math.random()>.975)drops[i]=0;drops[i]++})},55);
+</script></body></html>
