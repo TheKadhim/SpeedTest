@@ -92,7 +92,7 @@ async function uploadNode(s){
     base(s)+"/"+s.ulURL+"?cors=true&os="+Date.now(),
     {
       method:"POST",
-      headers:{"Content-Type":"application/octet-stream"},
+      headers:{"Content-Type":"text/plain;charset=UTF-8"},
       body:makeUploadBlob(n)
     },
     C.phaseTimeoutMs
